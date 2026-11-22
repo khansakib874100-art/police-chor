@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Police Chor</title>
+<style>
+ body{font-family:sans-serif;background:#111;color:#fff;text-align:center;padding:16px}
+ button{padding:14px 20px;margin:6px;font-size:18px;border:0;border-radius:10px;background:#e63946;color:#fff}
+ input{padding:12px;font-size:18px;border-radius:8px;border:0;width:80%;margin:6px}
+ #status{font-size:20px;margin:14px;min-height:60px}
+ .danger{background:#ff0000;animation:blink 0.5s infinite}
+ @keyframes blink{50%{background:#550000}}
+</style>
+</head>
+<body>
+<h2>Police Chor</h2>
+<input id="name" placeholder="Apna naam">
+<div>
+ <button onclick="setZone()">Zone set karo (yahi centre)</button>
+</div>
+<input id="radius" type="number" value="100" placeholder="Radius meter">
+<div>
+ <button onclick="startGame()">Game shuru</button>
+</div>
+<div>
+ <label>Role: </label>
+ <button onclick="randomRole()">Mera role dekho</button>
+</div>
+<div id="status">Pehle zone set karo</div>
+<div id="role"></div>
+
+<script>
+let center=null, watchId=null, out=false, warnTimer=null;
+const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+function dist(lat1,lon1,lat2,lon2){
+ const R=6371000, toRad=x=>x*Math.PI/180;
+ const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+ const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+ return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function siren(){
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.type='sawtooth';
+ o.connect(g); g.connect(audioCtx.destination);
+ let t=audioCtx.currentTime;
+ for(let i=0;i<6;i++){
+  o.frequency.setValueAtTime(600,t+i*0.5);
+  o.frequency.setValueAtTime(900,t+i*0.5+0.25);
+ }
+ o.start(); o.stop(t+3);
+ if(navigator.vibrate) navigator.vibrate([300,100,300,100,300]);
+}
+
+function setZone(){
+ document.getElementById('status').innerText='Location le raha hoon...';
+ navigator.geolocation.getCurrentPosition(p=>{
+  center={lat:p.coords.latitude,lon:p.coords.longitude};
+  document.getElementById('status').innerText='Zone set ho gaya!';
+ },e=>{
+  document.getElementById('status').innerText='Location allow karo: '+e.message;
+ },{enableHighAccuracy:true});
+}
+
+function randomRole(){
+ const r=Math.random()<0.4?'POLICE':'CHOR';
+ document.getElementById('role').innerText='Tera role: '+r;
+}
+
+function startGame(){
+ if(!center){alert('Pehle zone set karo');return;}
+ const radius=Number(document.getElementById('radius').value)||100;
+ const name=document.getElementById('name').value||'Player';
+ audioCtx.resume();
+ out=false;
+ watchId=navigator.geolocation.watchPosition(p=>{
+  if(out) return;
+  const d=dist(center.lat,center.lon,p.coords.latitude,p.coords.longitude);
+  const st=document.getElementById('status');
+  if(d>radius){
+   if(!warnTimer){
+    st.innerText='Zone ke bahar! 10 second mein wapas aao!';
+    st.className='danger';
+    siren();
+    warnTimer=setTimeout(()=>{
+     out=true;
+     siren();
+     st.innerText=name+' zone se bahar gaya, GAME SE OUT!';
+     navigator.geolocation.clearWatch(watchId);
+    },10000);
+   }
+  } else {
+   if(warnTimer){clearTimeout(warnTimer);warnTimer=null;}
+   st.className='';
+   st.innerText='Zone ke andar ho. Doori centre se: '+Math.round(d)+' m';
+  }
+ },e=>{
+  document.getElementById('status').innerText='GPS error: '+e.message;
+ },{enableHighAccuracy:true,maximumAge:1000});
+ document.getElementById('status').innerText='Game chalu hai!';
+}
+</script>
+</body>
+</html>
